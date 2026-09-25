@@ -12,7 +12,7 @@ DATASOURCE_TEMPLATE="${PROJECT_ROOT}/monitoring/grafana/provisioning/datasources
 DASHBOARD_PROVIDER="${PROJECT_ROOT}/monitoring/grafana/provisioning/dashboards/dashboards.yml"
 DASHBOARD="${PROJECT_ROOT}/monitoring/grafana/dashboards/iot-platform-overview.json"
 MANIFEST_TEMPLATE="${PROJECT_ROOT}/monitoring/grafana/kubernetes/deployment.yaml.template"
-GENERATED_MANIFEST="${PROJECT_ROOT}/monitoring/grafana/kubernetes/deployment.yaml"
+GENERATED_MANIFEST="${PROJECT_ROOT}/monitoring/grafana/kubernetes/deployment.generated.yaml"
 
 echo "============================================================"
 echo " CREATE - Grafana"
