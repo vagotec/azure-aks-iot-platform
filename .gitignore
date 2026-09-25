@@ -1,0 +1,3 @@
+config/edge.env
+*.generated.yaml
+*.generated.yml

@@ -1,0 +1,18 @@
+FROM ros:jazzy-ros-base
+
+SHELL ["/bin/bash", "-c"]
+
+WORKDIR /workspace
+
+COPY src/ /workspace/src/vagotec_ros2_fake_data_generator/
+
+RUN source /opt/ros/jazzy/setup.bash && \
+    colcon build \
+        --merge-install \
+        --packages-select vagotec_ros2_fake_data_generator
+
+COPY container/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

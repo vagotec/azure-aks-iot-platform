@@ -1,0 +1,25 @@
+FROM ros:jazzy-ros-base
+
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpaho-mqtt-dev \
+        libpaho-mqttpp-dev \
+        libcpp-httplib-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY src/ /workspace/src/vagotec_backend_service/
+
+RUN source /opt/ros/jazzy/setup.bash && \
+    colcon build \
+        --merge-install \
+        --packages-select vagotec_backend_service
+
+COPY container/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

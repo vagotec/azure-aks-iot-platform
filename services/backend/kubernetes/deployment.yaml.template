@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${BACKEND_NAME}
+  namespace: ${K8S_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: ${PROJECT_NAME}
+spec:
+  replicas: 1
+
+  # The Backend uses one fixed MQTT client ID.
+  # Recreate prevents old and new Pods from connecting to Mosquitto
+  # simultaneously during an update.
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/part-of: ${PROJECT_NAME}
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: ${PROJECT_NAME}
+
+    spec:
+      containers:
+        - name: backend
+          image: ${BACKEND_IMAGE}
+          imagePullPolicy: Never
+
+          ports:
+            - name: http
+              containerPort: ${REST_PORT}
+              protocol: TCP
+
+          env:
+            - name: ROS_DOMAIN_ID
+              value: "${ROS_DOMAIN_ID}"
+
+            - name: ROS2_TOPIC
+              value: "${ROS2_TOPIC}"
+
+            - name: ROS2_COMMAND_TOPIC
+              value: "${ROS2_COMMAND_TOPIC}"
+
+            - name: MQTT_HOST
+              value: "${MQTT_HOST}"
+
+            - name: MQTT_PORT
+              value: "${MQTT_PORT}"
+
+            - name: MQTT_TOPIC
+              value: "${MQTT_TOPIC}"
+
+            - name: MQTT_COMMAND_TOPIC
+              value: "${MQTT_COMMAND_TOPIC}"
+
+            - name: MQTT_CLIENT_ID
+              value: "${MQTT_CLIENT_ID}"
+
+            - name: MQTT_QOS
+              value: "${MQTT_QOS}"
+
+            - name: REST_HOST
+              value: "${REST_HOST}"
+
+            - name: REST_PORT
+              value: "${REST_PORT}"

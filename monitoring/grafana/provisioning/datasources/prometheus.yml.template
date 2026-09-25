@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://${PROMETHEUS_NAME}.${K8S_NAMESPACE}.svc.cluster.local:${PROMETHEUS_PORT}
+    isDefault: true
+    editable: false

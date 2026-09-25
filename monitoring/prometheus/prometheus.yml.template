@@ -1,0 +1,16 @@
+global:
+  scrape_interval: ${PROMETHEUS_SCRAPE_INTERVAL}
+  evaluation_interval: ${PROMETHEUS_SCRAPE_INTERVAL}
+
+scrape_configs:
+
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - 127.0.0.1:${PROMETHEUS_PORT}
+
+  - job_name: mosquitto
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - ${MOSQUITTO_EXPORTER_NAME}.${K8S_NAMESPACE}.svc.cluster.local:${MOSQUITTO_EXPORTER_PORT}
