@@ -45,8 +45,9 @@ else
     echo "OK: Backend REST Service absent."
 fi
 
-if sudo k3s ctr -n k8s.io images list -q |
-    grep -Fxq "${K3S_IMAGE}"; then
+if grep -Fxq "${K3S_IMAGE}" < <(
+    sudo k3s ctr -n k8s.io images list -q
+); then
     echo "ERROR: Backend image still exists in K3s."
     FAILED=1
 else

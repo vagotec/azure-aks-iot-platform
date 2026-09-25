@@ -4,7 +4,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-source "${PROJECT_ROOT}/config/edge.env"
+CONFIG_FILE="${PROJECT_ROOT}/config/edge.env"
+SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+
+if [[ ! -f "${SECRETS_FILE}" ]]; then
+  echo "ERROR: Missing local secrets file: ${SECRETS_FILE}"
+  exit 1
+fi
+
+set -a
+source "${CONFIG_FILE}"
+source "${SECRETS_FILE}"
+set +a
 
 LOCAL_PORT=13000
 PF_LOG="/tmp/${PROJECT_NAME}-grafana-portforward.log"

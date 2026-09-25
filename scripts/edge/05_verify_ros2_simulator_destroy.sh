@@ -48,8 +48,9 @@ fi
 echo
 echo "=== K3s Simulator Image ==="
 
-if sudo k3s ctr -n k8s.io images list -q \
-    | grep -Fxq "${K3S_IMAGE_REF}"; then
+if grep -Fxq "${K3S_IMAGE_REF}" < <(
+    sudo k3s ctr -n k8s.io images list -q
+); then
 
     echo "ERROR: Simulator image still exists in K3s:"
     echo "       ${K3S_IMAGE_REF}"

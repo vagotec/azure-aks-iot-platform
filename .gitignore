@@ -5,3 +5,5 @@ config/edge.env
 # React Frontend local artifacts
 frontend/react-dashboard/node_modules/
 frontend/react-dashboard/dist/
+
+config/secrets.env

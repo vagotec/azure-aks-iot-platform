@@ -3,9 +3,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+CONFIG_FILE="${PROJECT_ROOT}/config/edge.env"
 
-NAMESPACE="azure-aks-iot"
-GATEWAY_NAME="azure-aks-iot-platform"
+set -a
+source "${CONFIG_FILE}"
+set +a
 
 COMMAND='test'
 COMMAND_VALUE='phase-4b-frontend'
@@ -31,7 +33,7 @@ echo "============================================================"
 
 GATEWAY_ADDRESS="$(
   kubectl get gateway "${GATEWAY_NAME}" \
-    -n "${NAMESPACE}" \
+    -n "${K8S_NAMESPACE}" \
     -o jsonpath='{.status.addresses[0].value}'
 )"
 

@@ -65,8 +65,9 @@ fi
 echo
 echo "=== Remove Backend image from K3s ==="
 
-if sudo k3s ctr -n k8s.io images list -q |
-    grep -Fxq "${K3S_IMAGE}"; then
+if grep -Fxq "${K3S_IMAGE}" < <(
+    sudo k3s ctr -n k8s.io images list -q
+); then
 
     sudo k3s ctr -n k8s.io images remove "${K3S_IMAGE}"
 else

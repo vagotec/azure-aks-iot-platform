@@ -44,8 +44,8 @@ spec:
             - name: ROS2_TOPIC
               value: "${ROS2_TOPIC}"
 
-            - name: ROS2_COMMAND_TOPIC
-              value: "${ROS2_COMMAND_TOPIC}"
+            - name: ROS2_COMMAND_SERVICE
+              value: "${ROS2_COMMAND_SERVICE}"
 
             - name: MQTT_HOST
               value: "${MQTT_HOST}"

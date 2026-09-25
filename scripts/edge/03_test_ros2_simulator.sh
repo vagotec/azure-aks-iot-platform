@@ -25,7 +25,7 @@ fi
 
 echo "Pod:             ${POD}"
 echo "Telemetry topic: ${ROS2_TOPIC}"
-echo "Command service: ${ROS2_COMMAND_TOPIC}"
+echo "Command service: ${ROS2_COMMAND_SERVICE}"
 echo "Domain:          ${ROS_DOMAIN_ID}"
 echo "Device:          ${DEVICE_ID}"
 
@@ -95,7 +95,7 @@ SERVICE_RESPONSE="$(
           source /workspace/install/setup.bash
           export ROS_DOMAIN_ID='${ROS_DOMAIN_ID}'
           timeout 15 ros2 service call \
-            '${ROS2_COMMAND_TOPIC}' \
+            '${ROS2_COMMAND_SERVICE}' \
             vagotec_iot_interfaces/srv/DeviceCommand \
             \"{command: test, value: hello}\"
         "

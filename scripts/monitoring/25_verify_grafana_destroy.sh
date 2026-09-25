@@ -31,6 +31,7 @@ check_absent()
 check_absent deployment "${GRAFANA_NAME}"
 check_absent service "${GRAFANA_NAME}"
 check_absent configmap "${GRAFANA_PROVISIONING_CONFIGMAP}"
+check_absent secret "${GRAFANA_SECRET}"
 check_absent pvc "${GRAFANA_PVC}"
 
 if kubectl get pods \
@@ -54,9 +55,10 @@ if [[ "${CANONICAL_IMAGE}" != */*/* ]]; then
   CANONICAL_IMAGE="docker.io/${CANONICAL_IMAGE}"
 fi
 
-if sudo k3s ctr -n k8s.io images list \
-  | awk '{print $1}' \
-  | grep -Fxq "${CANONICAL_IMAGE}"; then
+if grep -Fxq "${CANONICAL_IMAGE}" < <(
+  sudo k3s ctr -n k8s.io images list |
+    awk '{print $1}'
+); then
 
   echo "ERROR: Grafana image still exists."
   exit 1

@@ -76,7 +76,9 @@ echo "=== Remove configured Mosquitto image from K3s containerd ==="
 
 IMAGE_REF="docker.io/library/${MOSQUITTO_IMAGE}"
 
-if sudo k3s ctr images list -q | grep -Fxq "${IMAGE_REF}"; then
+if grep -Fxq "${IMAGE_REF}" < <(
+    sudo k3s ctr images list -q
+); then
     sudo k3s ctr images remove "${IMAGE_REF}"
     echo "Removed: ${IMAGE_REF}"
 else

@@ -1,25 +1,55 @@
 #!/usr/bin/env bash
-
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+CONFIG_FILE="${PROJECT_ROOT}/config/edge.env"
+GATEWAY_DIR="${PROJECT_ROOT}/kubernetes/k3s/gateway"
+
 ENVOY_GATEWAY_VERSION="v1.9.1"
-NAMESPACE="envoy-gateway-system"
+ENVOY_NAMESPACE="envoy-gateway-system"
 RELEASE_NAME="eg"
 CHART="oci://docker.io/envoyproxy/gateway-helm"
 
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    echo "ERROR: Missing configuration: ${CONFIG_FILE}"
+    exit 1
+fi
+
+set -a
+source "${CONFIG_FILE}"
+set +a
+
+required_variables=(
+    PROJECT_NAME
+    K8S_NAMESPACE
+    GATEWAY_NAME
+    GATEWAY_CLASS_NAME
+    GATEWAY_HTTP_PORT
+    GATEWAY_HTTP_LISTENER_NAME
+)
+
+for variable in "${required_variables[@]}"; do
+    if [[ -z "${!variable:-}" ]]; then
+        echo "ERROR: Required configuration variable is empty: ${variable}"
+        exit 1
+    fi
+done
+
+GATEWAYCLASS_GENERATED="${GATEWAY_DIR}/gatewayclass.generated.yaml"
+GATEWAY_GENERATED="${GATEWAY_DIR}/gateway.generated.yaml"
+
 echo "========================================"
 echo " Azure AKS IoT Platform"
-echo " Phase 1.4 - Install Envoy Gateway"
+echo " Install Envoy Gateway + Platform Gateway"
 echo "========================================"
 echo
 echo "Envoy Gateway: ${ENVOY_GATEWAY_VERSION}"
+
 echo
+echo "=== Pre-flight checks ==="
 
-# ------------------------------------------------------------
-# Pre-flight checks
-# ------------------------------------------------------------
-
-for command in kubectl helm; do
+for command in kubectl helm envsubst; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "ERROR: ${command} is not installed."
         exit 1
@@ -36,99 +66,120 @@ if ! kubectl get nodes --no-headers | grep -q " Ready "; then
     exit 1
 fi
 
+echo
+echo "=== Ensure shared project namespace ==="
+
+kubectl create namespace "${K8S_NAMESPACE}" \
+  --dry-run=client \
+  -o yaml |
+  kubectl apply -f -
+
 echo "Pre-flight checks: OK"
 
-# ------------------------------------------------------------
-# Check current Gateway API state
-# ------------------------------------------------------------
-
 echo
-echo "=== Existing Gateway API CRDs ==="
-
-if kubectl get crd gateways.gateway.networking.k8s.io \
-    >/dev/null 2>&1; then
-
-    echo "Gateway API CRDs are already installed."
-    echo
-    kubectl get crd | grep 'gateway.networking.k8s.io' || true
-
-    echo
-    echo "ERROR:"
-    echo "Gateway API CRDs already exist."
-    echo "This script will not overwrite an existing CRD installation."
-    echo "Verify ownership/version before continuing."
-    exit 1
-else
-    echo "Gateway API CRDs are not installed."
-    echo "They will be installed by the Envoy Gateway Helm chart."
-fi
-
-# ------------------------------------------------------------
-# Prevent accidental duplicate installation
-# ------------------------------------------------------------
-
-echo
-echo "=== Existing Envoy Gateway Release ==="
+echo "=== Install Envoy Gateway ==="
 
 if helm status "${RELEASE_NAME}" \
-    --namespace "${NAMESPACE}" >/dev/null 2>&1; then
+    --namespace "${ENVOY_NAMESPACE}" >/dev/null 2>&1; then
 
-    echo "ERROR: Envoy Gateway Helm release already exists."
-    echo "Existing installation will NOT be modified."
-    exit 1
+    echo "Envoy Gateway Helm release already exists."
+    echo "Existing release will be reused."
 else
-    echo "No existing Envoy Gateway Helm release found."
+    if kubectl get crd gateways.gateway.networking.k8s.io \
+        >/dev/null 2>&1; then
+
+        echo "ERROR: Gateway API CRDs exist without the expected Helm release."
+        echo "Verify their ownership before continuing."
+        exit 1
+    fi
+
+    helm install "${RELEASE_NAME}" \
+        "${CHART}" \
+        --version "${ENVOY_GATEWAY_VERSION}" \
+        --namespace "${ENVOY_NAMESPACE}" \
+        --create-namespace
 fi
 
-# ------------------------------------------------------------
-# Install Gateway API CRDs + Envoy Gateway
-# ------------------------------------------------------------
-
 echo
-echo "Installing Gateway API CRDs and Envoy Gateway..."
-
-helm install "${RELEASE_NAME}" \
-    "${CHART}" \
-    --version "${ENVOY_GATEWAY_VERSION}" \
-    --namespace "${NAMESPACE}" \
-    --create-namespace
-
-# ------------------------------------------------------------
-# Wait for controller
-# ------------------------------------------------------------
-
-echo
-echo "Waiting for Envoy Gateway controller..."
+echo "=== Wait for Envoy Gateway controller ==="
 
 kubectl wait \
-    --namespace "${NAMESPACE}" \
+    --namespace "${ENVOY_NAMESPACE}" \
     deployment/envoy-gateway \
     --for=condition=Available \
     --timeout=5m
 
-# ------------------------------------------------------------
-# Basic result
-# ------------------------------------------------------------
+echo
+echo "=== Render Platform Gateway resources ==="
+
+envsubst \
+    < "${GATEWAY_DIR}/gatewayclass.yaml.template" \
+    > "${GATEWAYCLASS_GENERATED}"
+
+envsubst \
+    < "${GATEWAY_DIR}/gateway.yaml.template" \
+    > "${GATEWAY_GENERATED}"
+
+if grep -RInE \
+    '\$\{[A-Za-z_][A-Za-z0-9_]*\}' \
+    "${GATEWAYCLASS_GENERATED}" \
+    "${GATEWAY_GENERATED}"; then
+
+    echo "ERROR: Unresolved Gateway template variable."
+    exit 1
+fi
 
 echo
-echo "=== Envoy Gateway Pods ==="
-kubectl get pods -n "${NAMESPACE}"
+echo "=== Server-side validation ==="
+
+kubectl apply \
+    --dry-run=server \
+    -f "${GATEWAYCLASS_GENERATED}"
+
+kubectl apply \
+    --dry-run=server \
+    -f "${GATEWAY_GENERATED}"
 
 echo
-echo "=== Gateway API CRDs ==="
-kubectl get crd | grep 'gateway.networking.k8s.io' || true
+echo "=== Apply GatewayClass ==="
+
+kubectl apply \
+    -f "${GATEWAYCLASS_GENERATED}"
 
 echo
-echo "=== Envoy Gateway CRDs ==="
-kubectl get crd | grep 'gateway.envoyproxy.io' || true
+echo "=== Wait for GatewayClass acceptance ==="
+
+kubectl wait \
+    --for=condition=Accepted \
+    gatewayclass/"${GATEWAY_CLASS_NAME}" \
+    --timeout=120s
+
+echo
+echo "=== Apply Gateway ==="
+
+kubectl apply \
+    -f "${GATEWAY_GENERATED}"
+
+echo
+echo "=== Wait for Gateway programming ==="
+
+kubectl wait \
+    --for=condition=Programmed \
+    gateway/"${GATEWAY_NAME}" \
+    -n "${K8S_NAMESPACE}" \
+    --timeout=180s
+
+echo
+echo "=== Result ==="
+
+kubectl get gatewayclass "${GATEWAY_CLASS_NAME}"
+
+kubectl get gateway \
+    "${GATEWAY_NAME}" \
+    -n "${K8S_NAMESPACE}" \
+    -o wide
 
 echo
 echo "========================================"
-echo " Phase 1.4 completed successfully"
+echo " Envoy Gateway installation PASSED"
 echo "========================================"
-echo
-echo "Gateway API CRDs: installed"
-echo "Envoy Gateway:     installed"
-echo
-echo "Next step:"
-echo "  05_verify_envoy_gateway.sh"

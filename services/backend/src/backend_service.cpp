@@ -64,7 +64,7 @@ public:
   BackendService()
   : Node("vagotec_backend_service"),
     ros2_topic_(require_env("ROS2_TOPIC")),
-    ros2_command_service_(require_env("ROS2_COMMAND_TOPIC")),
+    ros2_command_service_(require_env("ROS2_COMMAND_SERVICE")),
     mqtt_host_(require_env("MQTT_HOST")),
     mqtt_port_(require_int_env("MQTT_PORT")),
     mqtt_topic_(require_env("MQTT_TOPIC")),

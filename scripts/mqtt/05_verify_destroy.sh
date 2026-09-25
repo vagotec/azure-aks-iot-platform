@@ -55,7 +55,9 @@ fi
 
 echo
 echo "=== K3s container image ==="
-if sudo k3s ctr images list -q | grep -Fxq "${IMAGE_REF}"; then
+if grep -Fxq "${IMAGE_REF}" < <(
+    sudo k3s ctr images list -q
+); then
     echo "ERROR: Mosquitto image still exists:"
     echo "       ${IMAGE_REF}"
     ERRORS=$((ERRORS + 1))

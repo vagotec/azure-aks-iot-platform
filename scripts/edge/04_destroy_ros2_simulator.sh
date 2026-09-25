@@ -65,8 +65,9 @@ rm -f "${RENDERED}"
 echo
 echo "=== Remove simulator image from K3s containerd ==="
 
-if sudo k3s ctr -n k8s.io images list -q \
-    | grep -Fxq "${K3S_IMAGE_REF}"; then
+if grep -Fxq "${K3S_IMAGE_REF}" < <(
+    sudo k3s ctr -n k8s.io images list -q
+); then
 
     sudo k3s ctr -n k8s.io images remove "${K3S_IMAGE_REF}"
     echo "Removed from K3s: ${K3S_IMAGE_REF}"

@@ -61,8 +61,9 @@ sudo k3s ctr -n k8s.io images import "${ARCHIVE}"
 
 K3S_IMAGE="docker.io/library/${BACKEND_IMAGE}"
 
-sudo k3s ctr -n k8s.io images list -q |
-    grep -Fxq "${K3S_IMAGE}"
+grep -Fxq "${K3S_IMAGE}" < <(
+    sudo k3s ctr -n k8s.io images list -q
+)
 
 echo "K3s image: ${K3S_IMAGE}"
 

@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+K3S_VERSION="v1.36.4+k3s1"
+
 echo "========================================"
 echo " Azure AKS IoT Platform"
 echo " Phase 1.1 - Install K3s"
@@ -36,7 +38,8 @@ echo
 
 echo "Installing K3s without Traefik..."
 
-curl -sfL https://get.k3s.io | sh -s - \
+curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_VERSION="${K3S_VERSION}" sh -s - \
     --disable=traefik
 
 echo

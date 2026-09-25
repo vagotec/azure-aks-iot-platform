@@ -4,8 +4,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
+CONFIG_FILE="${PROJECT_ROOT}/config/edge.env"
+SECRETS_FILE="${PROJECT_ROOT}/config/secrets.env"
+
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  echo "ERROR: Missing configuration: ${CONFIG_FILE}"
+  exit 1
+fi
+
+if [[ ! -f "${SECRETS_FILE}" ]]; then
+  echo "ERROR: Missing local secrets file: ${SECRETS_FILE}"
+  echo "Create it from config/secrets.env.example."
+  exit 1
+fi
+
 set -a
-source "${PROJECT_ROOT}/config/edge.env"
+source "${CONFIG_FILE}"
+source "${SECRETS_FILE}"
 set +a
 
 DATASOURCE_TEMPLATE="${PROJECT_ROOT}/monitoring/grafana/provisioning/datasources/prometheus.yml.template"
@@ -41,6 +56,7 @@ REQUIRED_VARS=(
   GRAFANA_PORT
   GRAFANA_STORAGE_SIZE
   GRAFANA_ADMIN_USER
+  GRAFANA_SECRET
   GRAFANA_ADMIN_PASSWORD
 )
 
@@ -56,6 +72,18 @@ for VAR in "${REQUIRED_VARS[@]}"; do
     echo "OK: ${VAR}=${!VAR}"
   fi
 done
+
+echo
+echo "=== Create or update Grafana Kubernetes Secret ==="
+
+kubectl create secret generic "${GRAFANA_SECRET}" \
+  --namespace "${K8S_NAMESPACE}" \
+  --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
+  --dry-run=client \
+  -o yaml \
+  | kubectl apply -f -
+
+echo "OK: Grafana Kubernetes Secret configured."
 
 echo
 echo "=== Render Grafana datasource ==="
@@ -91,7 +119,7 @@ echo
 echo "=== Render Kubernetes manifest ==="
 
 envsubst \
-  '${PROJECT_NAME} ${K8S_NAMESPACE} ${GRAFANA_IMAGE} ${GRAFANA_NAME} ${GRAFANA_PROVISIONING_CONFIGMAP} ${GRAFANA_PVC} ${GRAFANA_PORT} ${GRAFANA_STORAGE_SIZE} ${GRAFANA_ADMIN_USER} ${GRAFANA_ADMIN_PASSWORD} ${GRAFANA_DATASOURCE_CONFIG} ${GRAFANA_DASHBOARD_PROVIDER_CONFIG} ${GRAFANA_DASHBOARD_CONFIG}' \
+  '${PROJECT_NAME} ${K8S_NAMESPACE} ${GRAFANA_IMAGE} ${GRAFANA_NAME} ${GRAFANA_PROVISIONING_CONFIGMAP} ${GRAFANA_PVC} ${GRAFANA_PORT} ${GRAFANA_STORAGE_SIZE} ${GRAFANA_ADMIN_USER} ${GRAFANA_SECRET} ${GRAFANA_DATASOURCE_CONFIG} ${GRAFANA_DASHBOARD_PROVIDER_CONFIG} ${GRAFANA_DASHBOARD_CONFIG}' \
   < "${MANIFEST_TEMPLATE}" \
   > "${GENERATED_MANIFEST}"
 

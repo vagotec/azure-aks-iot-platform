@@ -91,9 +91,10 @@ sudo k3s ctr -n k8s.io images remove \
 echo
 echo "=== Verify image removal inside DESTROY ==="
 
-if sudo k3s ctr -n k8s.io images list \
-  | awk '{print $1}' \
-  | grep -Fxq "${CANONICAL_IMAGE}"; then
+if grep -Fxq "${CANONICAL_IMAGE}" < <(
+  sudo k3s ctr -n k8s.io images list |
+    awk '{print $1}'
+); then
 
   echo "ERROR: Prometheus image still exists after removal."
   exit 1

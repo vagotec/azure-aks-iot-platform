@@ -1,14 +1,14 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: azure-aks-iot-platform
-  namespace: azure-aks-iot
+  name: ${HTTPROUTE_NAME}
+  namespace: ${K8S_NAMESPACE}
   labels:
-    app.kubernetes.io/part-of: azure-aks-iot-platform
+    app.kubernetes.io/part-of: ${PROJECT_NAME}
 spec:
   parentRefs:
-    - name: azure-aks-iot-platform
-      sectionName: http
+    - name: ${GATEWAY_NAME}
+      sectionName: ${GATEWAY_HTTP_LISTENER_NAME}
 
   rules:
     - matches:
@@ -16,13 +16,13 @@ spec:
             type: PathPrefix
             value: /api
       backendRefs:
-        - name: azure-aks-iot-platform-backend
-          port: 8080
+        - name: ${BACKEND_NAME}
+          port: ${REST_PORT}
 
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: azure-aks-iot-platform-frontend
-          port: 8080
+        - name: ${FRONTEND_NAME}
+          port: ${FRONTEND_PORT}

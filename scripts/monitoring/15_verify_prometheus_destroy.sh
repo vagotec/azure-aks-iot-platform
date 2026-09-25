@@ -49,8 +49,9 @@ echo "OK: Prometheus Pods absent."
 echo
 echo "=== Verify Prometheus image is absent ==="
 
-if sudo k3s ctr -n k8s.io images list \
-  | grep -F "${PROMETHEUS_IMAGE}"; then
+if grep -Fq "${PROMETHEUS_IMAGE}" < <(
+  sudo k3s ctr -n k8s.io images list
+); then
 
   echo "ERROR: Prometheus image still exists."
   exit 1

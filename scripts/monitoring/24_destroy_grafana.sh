@@ -26,6 +26,11 @@ kubectl delete configmap \
   -n "${K8S_NAMESPACE}" \
   --ignore-not-found=true
 
+kubectl delete secret \
+  "${GRAFANA_SECRET}" \
+  -n "${K8S_NAMESPACE}" \
+  --ignore-not-found=true
+
 kubectl delete pvc \
   "${GRAFANA_PVC}" \
   -n "${K8S_NAMESPACE}" \
@@ -85,9 +90,10 @@ sudo k3s ctr -n k8s.io images remove \
 echo
 echo "=== Verify image removal inside DESTROY ==="
 
-if sudo k3s ctr -n k8s.io images list \
-  | awk '{print $1}' \
-  | grep -Fxq "${CANONICAL_IMAGE}"; then
+if grep -Fxq "${CANONICAL_IMAGE}" < <(
+  sudo k3s ctr -n k8s.io images list |
+    awk '{print $1}'
+); then
   echo "ERROR: Grafana image still exists after removal."
   exit 1
 fi

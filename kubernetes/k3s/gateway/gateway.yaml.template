@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: ${GATEWAY_NAME}
+  namespace: ${K8S_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: ${PROJECT_NAME}
+spec:
+  gatewayClassName: ${GATEWAY_CLASS_NAME}
+  listeners:
+    - name: ${GATEWAY_HTTP_LISTENER_NAME}
+      protocol: HTTP
+      port: ${GATEWAY_HTTP_PORT}
+      allowedRoutes:
+        namespaces:
+          from: Same

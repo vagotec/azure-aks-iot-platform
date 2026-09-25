@@ -39,7 +39,7 @@ public:
   FakeDataGenerator()
   : Node("vagotec_ros2_fake_data_generator"),
     topic_(require_env("ROS2_TOPIC")),
-    command_service_name_(require_env("ROS2_COMMAND_TOPIC")),
+    command_service_name_(require_env("ROS2_COMMAND_SERVICE")),
     device_id_(require_env("DEVICE_ID")),
     publish_interval_seconds_(
       std::stod(require_env("PUBLISH_INTERVAL_SECONDS")))

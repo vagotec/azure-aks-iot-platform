@@ -3,18 +3,42 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
+CONFIG_FILE="${PROJECT_ROOT}/config/edge.env"
 FRONTEND_DIR="${PROJECT_ROOT}/frontend/react-dashboard"
+K8S_DIR="${FRONTEND_DIR}/kubernetes"
 
-NAMESPACE="azure-aks-iot"
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+  echo "ERROR: Missing configuration: ${CONFIG_FILE}"
+  exit 1
+fi
 
-FRONTEND_NAME="azure-aks-iot-platform-frontend"
-FRONTEND_IMAGE="azure-aks-iot-platform-frontend:local"
+set -a
+source "${CONFIG_FILE}"
+set +a
 
-BACKEND_NAME="azure-aks-iot-platform-backend"
+required_variables=(
+  PROJECT_NAME
+  K8S_NAMESPACE
+  FRONTEND_IMAGE
+  FRONTEND_NAME
+  FRONTEND_PORT
+  BACKEND_NAME
+  REST_PORT
+  GATEWAY_NAME
+  GATEWAY_HTTP_LISTENER_NAME
+  HTTPROUTE_NAME
+)
 
-GATEWAY_NAME="azure-aks-iot-platform"
-HTTPROUTE_NAME="azure-aks-iot-platform"
+for variable in "${required_variables[@]}"; do
+  if [[ -z "${!variable:-}" ]]; then
+    echo "ERROR: Required configuration variable is empty: ${variable}"
+    exit 1
+  fi
+done
+
+DEPLOYMENT_GENERATED="${K8S_DIR}/deployment.generated.yaml"
+SERVICE_GENERATED="${K8S_DIR}/service.generated.yaml"
+HTTPROUTE_GENERATED="${K8S_DIR}/httproute.generated.yaml"
 
 echo "============================================================"
 echo " DEPLOY - React Frontend"
@@ -25,7 +49,7 @@ cd "${PROJECT_ROOT}"
 echo
 echo "=== Verify prerequisites ==="
 
-kubectl get namespace "${NAMESPACE}" >/dev/null
+kubectl get namespace "${K8S_NAMESPACE}" >/dev/null
 
 kubectl wait \
   --for=condition=Accepted \
@@ -35,12 +59,12 @@ kubectl wait \
 kubectl wait \
   --for=condition=Programmed \
   gateway/"${GATEWAY_NAME}" \
-  -n "${NAMESPACE}" \
+  -n "${K8S_NAMESPACE}" \
   --timeout=60s
 
 kubectl rollout status \
   deployment/"${BACKEND_NAME}" \
-  -n "${NAMESPACE}" \
+  -n "${K8S_NAMESPACE}" \
   --timeout=120s
 
 echo
@@ -96,44 +120,50 @@ sudo k3s ctr -n k8s.io images list |
   grep -F "docker.io/library/${FRONTEND_IMAGE}"
 
 echo
+echo "=== Render Kubernetes manifests from central configuration ==="
+
+envsubst < "${K8S_DIR}/deployment.yaml.template" \
+  > "${DEPLOYMENT_GENERATED}"
+
+envsubst < "${K8S_DIR}/service.yaml.template" \
+  > "${SERVICE_GENERATED}"
+
+envsubst < "${K8S_DIR}/httproute.yaml.template" \
+  > "${HTTPROUTE_GENERATED}"
+
+echo
 echo "=== Validate Kubernetes manifests ==="
 
-cd "${PROJECT_ROOT}"
+kubectl apply \
+  --dry-run=server \
+  -f "${DEPLOYMENT_GENERATED}"
 
 kubectl apply \
   --dry-run=server \
-  -f frontend/react-dashboard/kubernetes/deployment.yaml
+  -f "${SERVICE_GENERATED}"
 
 kubectl apply \
   --dry-run=server \
-  -f frontend/react-dashboard/kubernetes/service.yaml
-
-kubectl apply \
-  --dry-run=server \
-  -f frontend/react-dashboard/kubernetes/httproute.yaml
+  -f "${HTTPROUTE_GENERATED}"
 
 echo
 echo "=== Deploy Frontend Deployment and Service ==="
 
-kubectl apply \
-  -f frontend/react-dashboard/kubernetes/service.yaml
-
-kubectl apply \
-  -f frontend/react-dashboard/kubernetes/deployment.yaml
+kubectl apply -f "${SERVICE_GENERATED}"
+kubectl apply -f "${DEPLOYMENT_GENERATED}"
 
 echo
 echo "=== Wait for Frontend rollout ==="
 
 kubectl rollout status \
   deployment/"${FRONTEND_NAME}" \
-  -n "${NAMESPACE}" \
+  -n "${K8S_NAMESPACE}" \
   --timeout=180s
 
 echo
 echo "=== Deploy HTTPRoute ==="
 
-kubectl apply \
-  -f frontend/react-dashboard/kubernetes/httproute.yaml
+kubectl apply -f "${HTTPROUTE_GENERATED}"
 
 echo
 echo "=== Wait for HTTPRoute acceptance ==="
@@ -143,7 +173,7 @@ ROUTE_ACCEPTED=false
 for _ in $(seq 1 30); do
   ROUTE_STATUS="$(
     kubectl get httproute "${HTTPROUTE_NAME}" \
-      -n "${NAMESPACE}" \
+      -n "${K8S_NAMESPACE}" \
       -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}' \
       2>/dev/null || true
   )"
@@ -160,7 +190,7 @@ if [[ "${ROUTE_ACCEPTED}" != "true" ]]; then
   echo "ERROR: HTTPRoute was not accepted."
   kubectl describe httproute \
     "${HTTPROUTE_NAME}" \
-    -n "${NAMESPACE}" || true
+    -n "${K8S_NAMESPACE}" || true
   exit 1
 fi
 
@@ -169,7 +199,7 @@ echo "=== Verify HTTPRoute references ==="
 
 RESOLVED_REFS="$(
   kubectl get httproute "${HTTPROUTE_NAME}" \
-    -n "${NAMESPACE}" \
+    -n "${K8S_NAMESPACE}" \
     -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}'
 )"
 
@@ -177,7 +207,7 @@ if [[ "${RESOLVED_REFS}" != "True" ]]; then
   echo "ERROR: HTTPRoute backend references were not resolved."
   kubectl describe httproute \
     "${HTTPROUTE_NAME}" \
-    -n "${NAMESPACE}"
+    -n "${K8S_NAMESPACE}"
   exit 1
 fi
 
@@ -186,7 +216,7 @@ echo "=== Gateway address ==="
 
 GATEWAY_ADDRESS="$(
   kubectl get gateway "${GATEWAY_NAME}" \
-    -n "${NAMESPACE}" \
+    -n "${K8S_NAMESPACE}" \
     -o jsonpath='{.status.addresses[0].value}'
 )"
 
@@ -196,13 +226,13 @@ echo
 echo "=== Frontend resources ==="
 
 kubectl get deployment,service \
-  -n "${NAMESPACE}" \
+  -n "${K8S_NAMESPACE}" \
   -l app.kubernetes.io/name=frontend \
   -o wide
 
 kubectl get httproute \
   "${HTTPROUTE_NAME}" \
-  -n "${NAMESPACE}" \
+  -n "${K8S_NAMESPACE}" \
   -o wide
 
 echo

@@ -50,8 +50,9 @@ echo "OK: Pods absent."
 echo
 echo "=== Verify exporter image is absent ==="
 
-if sudo k3s ctr -n k8s.io images list \
-  | grep -F "${MOSQUITTO_EXPORTER_IMAGE}"; then
+if grep -Fq "${MOSQUITTO_EXPORTER_IMAGE}" < <(
+  sudo k3s ctr -n k8s.io images list
+); then
 
   echo "ERROR: Exporter image still exists."
   exit 1
