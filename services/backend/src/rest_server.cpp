@@ -7,18 +7,20 @@ RestServer::RestServer(
   const std::string &host,
   int port,
   SharedState &shared_state,
-  std::function<void(const std::string &)> command_handler)
+  CommandHandler command_handler)
 : host_(host),
   port_(port),
   shared_state_(shared_state),
   command_handler_(std::move(command_handler))
 {
   if (host_.empty()) {
-    throw std::runtime_error("REST host must not be empty.");
+    throw std::runtime_error(
+      "REST host must not be empty.");
   }
 
   if (port_ < 1 || port_ > 65535) {
-    throw std::runtime_error("REST port must be between 1 and 65535.");
+    throw std::runtime_error(
+      "REST port must be between 1 and 65535.");
   }
 
   configure_routes();
@@ -42,8 +44,12 @@ void RestServer::configure_routes()
 
   server_.Get(
     "/api/telemetry/latest",
-    [this](const httplib::Request &, httplib::Response &response) {
-      const auto telemetry = shared_state_.get_latest_telemetry();
+    [this](
+      const httplib::Request &,
+      httplib::Response &response)
+    {
+      const auto telemetry =
+        shared_state_.get_latest_telemetry();
 
       if (!telemetry.has_value()) {
         response.status = 503;
@@ -61,7 +67,10 @@ void RestServer::configure_routes()
 
   server_.Post(
     "/api/commands",
-    [this](const httplib::Request &request, httplib::Response &response) {
+    [this](
+      const httplib::Request &request,
+      httplib::Response &response)
+    {
       if (request.body.empty()) {
         response.status = 400;
         response.set_content(
@@ -79,16 +88,28 @@ void RestServer::configure_routes()
       }
 
       try {
-        command_handler_(request.body);
+        const std::string result =
+          command_handler_(request.body);
 
-        response.status = 202;
+        response.status = 200;
         response.set_content(
-          R"({"status":"accepted"})",
+          result,
           "application/json");
-      } catch (const std::exception &) {
-        response.status = 500;
+      } catch (const std::invalid_argument &error) {
+        response.status = 400;
         response.set_content(
-          R"({"error":"command_publish_failed"})",
+          std::string(
+            R"({"error":"invalid_command","message":")") +
+          error.what() +
+          R"("})",
+          "application/json");
+      } catch (const std::runtime_error &error) {
+        response.status = 503;
+        response.set_content(
+          std::string(
+            R"({"error":"device_command_failed","message":")") +
+          error.what() +
+          R"("})",
           "application/json");
       }
     });
@@ -102,19 +123,22 @@ void RestServer::start()
 
   server_thread_ = std::thread(
     [this]() {
-      const bool result = server_.listen(host_, port_);
+      const bool result =
+        server_.listen(host_, port_);
+
       running_.store(false);
 
       if (!result && !server_.is_running()) {
-        // listen() also returns false when stop() intentionally terminates
-        // the server, so startup validation is performed by the caller/tests.
+        // listen() also returns false after an intentional stop().
       }
     });
 }
 
 void RestServer::stop()
 {
-  if (!running_.load() && !server_thread_.joinable()) {
+  if (!running_.load() &&
+      !server_thread_.joinable())
+  {
     return;
   }
 

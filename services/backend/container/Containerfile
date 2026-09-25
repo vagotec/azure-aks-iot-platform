@@ -6,19 +6,24 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         libpaho-mqtt-dev \
         libpaho-mqttpp-dev \
-        libcpp-httplib-dev && \
+        libcpp-httplib-dev \
+        nlohmann-json3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 
-COPY src/ /workspace/src/vagotec_backend_service/
+COPY interfaces/ros2-command/ \
+  /workspace/src/vagotec_iot_interfaces/
+
+COPY services/backend/src/ \
+  /workspace/src/vagotec_backend_service/
 
 RUN source /opt/ros/jazzy/setup.bash && \
     colcon build \
-        --merge-install \
-        --packages-select vagotec_backend_service
+      --merge-install \
+      --packages-up-to vagotec_backend_service
 
-COPY container/entrypoint.sh /entrypoint.sh
+COPY services/backend/container/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 

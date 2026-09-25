@@ -4,14 +4,18 @@ SHELL ["/bin/bash", "-c"]
 
 WORKDIR /workspace
 
-COPY src/ /workspace/src/vagotec_ros2_fake_data_generator/
+COPY interfaces/ros2-command/ \
+  /workspace/src/vagotec_iot_interfaces/
+
+COPY edge/ros2-simulator/src/ \
+  /workspace/src/vagotec_ros2_fake_data_generator/
 
 RUN source /opt/ros/jazzy/setup.bash && \
     colcon build \
-        --merge-install \
-        --packages-select vagotec_ros2_fake_data_generator
+      --merge-install \
+      --packages-up-to vagotec_ros2_fake_data_generator
 
-COPY container/entrypoint.sh /entrypoint.sh
+COPY edge/ros2-simulator/container/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 

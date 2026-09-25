@@ -8,6 +8,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(vagotec_iot_interfaces REQUIRED)
 
 add_executable(fake_data_generator
   fake_data_generator.cpp
@@ -16,6 +17,7 @@ add_executable(fake_data_generator
 ament_target_dependencies(fake_data_generator
   rclcpp
   std_msgs
+  vagotec_iot_interfaces
 )
 
 install(TARGETS

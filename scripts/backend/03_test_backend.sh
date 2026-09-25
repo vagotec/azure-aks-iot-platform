@@ -6,20 +6,12 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 source "${PROJECT_ROOT}/config/edge.env"
 
-HEALTH_PORT=18080
-TELEMETRY_PORT=18081
-COMMAND_PORT=18082
+REST_PORT_FORWARD=18080
 
 PF_PID=""
-SUBSCRIBER_PID=""
 TMP_FILES=()
 
 cleanup() {
-    if [[ -n "${SUBSCRIBER_PID}" ]]; then
-        kill "${SUBSCRIBER_PID}" 2>/dev/null || true
-        wait "${SUBSCRIBER_PID}" 2>/dev/null || true
-    fi
-
     if [[ -n "${PF_PID}" ]]; then
         kill "${PF_PID}" 2>/dev/null || true
         wait "${PF_PID}" 2>/dev/null || true
@@ -29,6 +21,7 @@ cleanup() {
         rm -f "${file}"
     done
 }
+
 trap cleanup EXIT
 
 new_tmp() {
@@ -38,22 +31,13 @@ new_tmp() {
     printf '%s\n' "${file}"
 }
 
-stop_port_forward() {
-    if [[ -n "${PF_PID}" ]]; then
-        kill "${PF_PID}" 2>/dev/null || true
-        wait "${PF_PID}" 2>/dev/null || true
-        PF_PID=""
-    fi
-}
-
 start_port_forward() {
-    local local_port="$1"
-    local log_file="$2"
+    local log_file="$1"
 
     kubectl port-forward \
         -n "${K8S_NAMESPACE}" \
         service/"${BACKEND_NAME}" \
-        "${local_port}:${REST_PORT}" \
+        "${REST_PORT_FORWARD}:${REST_PORT}" \
         >"${log_file}" 2>&1 &
 
     PF_PID=$!
@@ -63,8 +47,9 @@ start_port_forward() {
             --silent \
             --fail \
             --http1.1 \
-            "http://127.0.0.1:${local_port}/api/health" \
+            "http://127.0.0.1:${REST_PORT_FORWARD}/api/health" \
             >/dev/null 2>&1; then
+
             return 0
         fi
 
@@ -118,10 +103,15 @@ SIMULATOR_POD="$(
 if [[ -z "${BACKEND_POD}" ||
       -z "${MOSQUITTO_POD}" ||
       -z "${SIMULATOR_POD}" ]]; then
+
     echo "ERROR: Required Pods not found."
     exit 1
 fi
 
+echo
+echo "Backend Pod  : ${BACKEND_POD}"
+echo "Mosquitto Pod: ${MOSQUITTO_POD}"
+echo "Simulator Pod: ${SIMULATOR_POD}"
 
 # ------------------------------------------------------------
 # TEST 1 - ROS 2 -> Backend -> MQTT 5
@@ -150,44 +140,44 @@ import sys
 data = json.loads(sys.argv[1])
 
 if data.get("device_id") != sys.argv[2]:
-    raise SystemExit("ERROR: Unexpected telemetry device_id.")
+    raise SystemExit(
+        "ERROR: Unexpected telemetry device_id."
+    )
 
-for field in ("temperature_c", "humidity_percent"):
-    if not isinstance(data.get(field), (int, float)):
-        raise SystemExit(f"ERROR: Invalid telemetry field: {field}")
+for field in (
+    "temperature_c",
+    "humidity_percent",
+):
+    if not isinstance(
+        data.get(field),
+        (int, float),
+    ):
+        raise SystemExit(
+            f"ERROR: Invalid telemetry field: {field}"
+        )
 
 print("Telemetry payload: VALID")
 PY
 
-echo "PASSED: ROS 2 -> MQTT 5"
-
+echo "PASSED: ROS 2 -> Backend -> MQTT 5"
 
 # ------------------------------------------------------------
-# TEST 2 - MQTT 5 -> Backend -> ROS 2
+# TEST 2 - MQTT 5 -> Backend -> ROS 2 Service -> Simulator
 # ------------------------------------------------------------
 
 echo
-echo "=== 2/5 MQTT 5 -> C++ Backend -> ROS 2 ==="
+echo "=== 2/5 MQTT 5 -> Backend -> ROS 2 Service -> Simulator ==="
 
 MQTT_COMMAND='{"command":"test","value":"backend-mqtt"}'
-MQTT_ROS_OUTPUT="$(new_tmp)"
 
-kubectl exec \
-    -n "${K8S_NAMESPACE}" \
-    "${SIMULATOR_POD}" -- \
-    bash -lc "
-        source /opt/ros/jazzy/setup.bash
-        source /workspace/install/setup.bash
-        export ROS_DOMAIN_ID='${ROS_DOMAIN_ID}'
-        timeout 20 ros2 topic echo \
-            '${ROS2_COMMAND_TOPIC}' \
-            std_msgs/msg/String \
-            --once
-    " >"${MQTT_ROS_OUTPUT}" 2>&1 &
-
-SUBSCRIBER_PID=$!
-
-sleep 3
+BEFORE_LOG_COUNT="$(
+    kubectl logs \
+        -n "${K8S_NAMESPACE}" \
+        "${SIMULATOR_POD}" |
+        grep -Fc \
+            "Simulator executed command 'test' with value 'backend-mqtt'" ||
+    true
+)"
 
 kubectl exec \
     -n "${K8S_NAMESPACE}" \
@@ -200,13 +190,39 @@ kubectl exec \
         -q "${MQTT_QOS}" \
         -m "${MQTT_COMMAND}"
 
-wait "${SUBSCRIBER_PID}"
-SUBSCRIBER_PID=""
+MQTT_EXECUTED=0
 
-grep -Fq "${MQTT_COMMAND}" "${MQTT_ROS_OUTPUT}"
+for _ in $(seq 1 30); do
+    AFTER_LOG_COUNT="$(
+        kubectl logs \
+            -n "${K8S_NAMESPACE}" \
+            "${SIMULATOR_POD}" |
+            grep -Fc \
+                "Simulator executed command 'test' with value 'backend-mqtt'" ||
+        true
+    )"
 
-echo "PASSED: MQTT 5 -> ROS 2"
+    if (( AFTER_LOG_COUNT > BEFORE_LOG_COUNT )); then
+        MQTT_EXECUTED=1
+        break
+    fi
 
+    sleep 0.2
+done
+
+if [[ "${MQTT_EXECUTED}" -ne 1 ]]; then
+    echo "ERROR: Simulator did not execute MQTT command."
+    exit 1
+fi
+
+echo "PASSED: MQTT 5 -> Backend -> ROS 2 Service -> Simulator"
+
+# ------------------------------------------------------------
+# Start one REST port-forward for tests 3-5
+# ------------------------------------------------------------
+
+PF_LOG="$(new_tmp)"
+start_port_forward "${PF_LOG}"
 
 # ------------------------------------------------------------
 # TEST 3 - REST Health
@@ -215,10 +231,7 @@ echo "PASSED: MQTT 5 -> ROS 2"
 echo
 echo "=== 3/5 REST GET /api/health ==="
 
-HEALTH_LOG="$(new_tmp)"
 HEALTH_RESPONSE="$(new_tmp)"
-
-start_port_forward "${HEALTH_PORT}" "${HEALTH_LOG}"
 
 HTTP_STATUS="$(
     curl \
@@ -227,31 +240,38 @@ HTTP_STATUS="$(
         --http1.1 \
         --output "${HEALTH_RESPONSE}" \
         --write-out '%{http_code}' \
-        "http://127.0.0.1:${HEALTH_PORT}/api/health"
+        "http://127.0.0.1:${REST_PORT_FORWARD}/api/health"
 )"
 
-[[ "${HTTP_STATUS}" == "200" ]]
+if [[ "${HTTP_STATUS}" != "200" ]]; then
+    echo "ERROR: REST health returned HTTP ${HTTP_STATUS}."
+    cat "${HEALTH_RESPONSE}"
+    exit 1
+fi
 
 python3 - "${HEALTH_RESPONSE}" <<'PY'
 import json
 import pathlib
 import sys
 
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+data = json.loads(
+    pathlib.Path(sys.argv[1]).read_text()
+)
 
 if data.get("status") != "ok":
-    raise SystemExit("ERROR: REST health status is not ok.")
+    raise SystemExit(
+        "ERROR: REST health status is not ok."
+    )
 
 if data.get("service") != "vagotec_backend_service":
-    raise SystemExit("ERROR: Unexpected REST service name.")
+    raise SystemExit(
+        "ERROR: Unexpected REST service name."
+    )
 
 print("REST health response: VALID")
 PY
 
-stop_port_forward
-
 echo "PASSED: REST Health"
-
 
 # ------------------------------------------------------------
 # TEST 4 - REST Telemetry
@@ -260,11 +280,7 @@ echo "PASSED: REST Health"
 echo
 echo "=== 4/5 REST GET /api/telemetry/latest ==="
 
-TELEMETRY_LOG="$(new_tmp)"
 TELEMETRY_RESPONSE="$(new_tmp)"
-
-start_port_forward "${TELEMETRY_PORT}" "${TELEMETRY_LOG}"
-
 TELEMETRY_STATUS=""
 
 for _ in $(seq 1 30); do
@@ -275,7 +291,7 @@ for _ in $(seq 1 30); do
             --http1.1 \
             --output "${TELEMETRY_RESPONSE}" \
             --write-out '%{http_code}' \
-            "http://127.0.0.1:${TELEMETRY_PORT}/api/telemetry/latest" ||
+            "http://127.0.0.1:${REST_PORT_FORWARD}/api/telemetry/latest" ||
         true
     )"
 
@@ -288,61 +304,53 @@ done
 
 if [[ "${TELEMETRY_STATUS}" != "200" ]]; then
     echo "ERROR: REST telemetry did not return HTTP 200."
+    cat "${TELEMETRY_RESPONSE}"
     exit 1
 fi
 
-python3 - "${TELEMETRY_RESPONSE}" "${DEVICE_ID}" <<'PY'
+python3 - \
+    "${TELEMETRY_RESPONSE}" \
+    "${DEVICE_ID}" <<'PY'
 import json
 import pathlib
 import sys
 
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+data = json.loads(
+    pathlib.Path(sys.argv[1]).read_text()
+)
 
 if data.get("device_id") != sys.argv[2]:
-    raise SystemExit("ERROR: Unexpected REST telemetry device_id.")
+    raise SystemExit(
+        "ERROR: Unexpected REST telemetry device_id."
+    )
 
-for field in ("temperature_c", "humidity_percent"):
-    if not isinstance(data.get(field), (int, float)):
-        raise SystemExit(f"ERROR: Invalid REST telemetry field: {field}")
+for field in (
+    "temperature_c",
+    "humidity_percent",
+):
+    if not isinstance(
+        data.get(field),
+        (int, float),
+    ):
+        raise SystemExit(
+            f"ERROR: Invalid REST telemetry field: {field}"
+        )
 
 print("REST telemetry response: VALID")
 PY
 
-stop_port_forward
-
 echo "PASSED: REST Telemetry"
 
-
 # ------------------------------------------------------------
-# TEST 5 - REST -> Backend -> ROS 2
+# TEST 5 - REST -> Backend -> ROS 2 Service -> Simulator
+#          -> Backend -> REST
 # ------------------------------------------------------------
 
 echo
-echo "=== 5/5 REST POST /api/commands -> ROS 2 ==="
+echo "=== 5/5 REST Command full round-trip ==="
 
 REST_COMMAND='{"command":"test","value":"backend-rest"}'
-REST_ROS_OUTPUT="$(new_tmp)"
-COMMAND_LOG="$(new_tmp)"
 COMMAND_RESPONSE="$(new_tmp)"
-
-kubectl exec \
-    -n "${K8S_NAMESPACE}" \
-    "${SIMULATOR_POD}" -- \
-    bash -lc "
-        source /opt/ros/jazzy/setup.bash
-        source /workspace/install/setup.bash
-        export ROS_DOMAIN_ID='${ROS_DOMAIN_ID}'
-        timeout 20 ros2 topic echo \
-            '${ROS2_COMMAND_TOPIC}' \
-            std_msgs/msg/String \
-            --once
-    " >"${REST_ROS_OUTPUT}" 2>&1 &
-
-SUBSCRIBER_PID=$!
-
-sleep 3
-
-start_port_forward "${COMMAND_PORT}" "${COMMAND_LOG}"
 
 COMMAND_STATUS="$(
     curl \
@@ -354,40 +362,64 @@ COMMAND_STATUS="$(
         --data "${REST_COMMAND}" \
         --output "${COMMAND_RESPONSE}" \
         --write-out '%{http_code}' \
-        "http://127.0.0.1:${COMMAND_PORT}/api/commands"
+        "http://127.0.0.1:${REST_PORT_FORWARD}/api/commands"
 )"
 
-[[ "${COMMAND_STATUS}" == "202" ]]
+echo "HTTP status : ${COMMAND_STATUS}"
+echo -n "Response    : "
+cat "${COMMAND_RESPONSE}"
+echo
+
+if [[ "${COMMAND_STATUS}" != "200" ]]; then
+    echo "ERROR: REST command did not return HTTP 200."
+    exit 1
+fi
 
 python3 - "${COMMAND_RESPONSE}" <<'PY'
 import json
 import pathlib
 import sys
 
-data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+data = json.loads(
+    pathlib.Path(sys.argv[1]).read_text()
+)
 
-if data.get("status") != "accepted":
-    raise SystemExit("ERROR: REST command was not accepted.")
+if data.get("success") is not True:
+    raise SystemExit(
+        "ERROR: Simulator response success is not true."
+    )
 
-print("REST command response: VALID")
+if data.get("status") != "executed":
+    raise SystemExit(
+        "ERROR: Simulator response status is not executed."
+    )
+
+expected = (
+    "Simulator executed command 'test' "
+    "with value 'backend-rest'"
+)
+
+if data.get("message") != expected:
+    raise SystemExit(
+        "ERROR: Unexpected simulator response message.\n"
+        f"Expected: {expected}\n"
+        f"Actual:   {data.get('message')}"
+    )
+
+print("REST device command response: VALID")
+print("Device execution acknowledgement: VALID")
 PY
 
-wait "${SUBSCRIBER_PID}"
-SUBSCRIBER_PID=""
-
-grep -Fq "${REST_COMMAND}" "${REST_ROS_OUTPUT}"
-
-stop_port_forward
-
-echo "PASSED: REST -> ROS 2"
+echo "PASSED: REST -> Backend -> ROS 2 -> Simulator -> REST"
 
 echo
 echo "============================================================"
 echo " BACKEND FUNCTIONAL TEST PASSED"
 echo "============================================================"
-echo " ROS 2 -> MQTT 5            : PASSED"
-echo " MQTT 5 -> ROS 2            : PASSED"
-echo " REST Health                : PASSED"
-echo " REST Telemetry             : PASSED"
-echo " REST Command -> ROS 2      : PASSED"
+echo " ROS 2 -> Backend -> MQTT 5                 : PASSED"
+echo " MQTT 5 -> Backend -> ROS 2 -> Simulator    : PASSED"
+echo " REST Health                               : PASSED"
+echo " REST Telemetry                            : PASSED"
+echo " REST -> Backend -> ROS 2 -> Simulator"
+echo "      -> Backend -> REST                   : PASSED"
 echo "============================================================"

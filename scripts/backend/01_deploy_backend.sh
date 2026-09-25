@@ -43,10 +43,12 @@ kubectl rollout status \
 echo
 echo "=== Build Backend image ==="
 
+# The Backend depends on the shared ROS 2 interface package.
+# Therefore the project root is the Docker build context.
 docker build \
     -f "${PROJECT_ROOT}/services/backend/container/Containerfile" \
     -t "${BACKEND_IMAGE}" \
-    "${PROJECT_ROOT}/services/backend"
+    "${PROJECT_ROOT}"
 
 echo
 echo "=== Import Backend image into K3s ==="

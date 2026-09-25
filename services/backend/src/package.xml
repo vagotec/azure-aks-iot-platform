@@ -2,7 +2,7 @@
 <package format="3">
   <name>vagotec_backend_service</name>
   <version>0.1.0</version>
-  <description>C++ backend service for ROS 2 and MQTT 5 communication.</description>
+  <description>C++ backend service for ROS 2, MQTT 5 and REST communication.</description>
 
   <maintainer email="sarvg@web.de">vagoTec</maintainer>
   <license>Apache-2.0</license>
@@ -11,6 +11,7 @@
 
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
+  <depend>vagotec_iot_interfaces</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

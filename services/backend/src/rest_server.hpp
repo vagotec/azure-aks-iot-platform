@@ -14,11 +14,15 @@
 class RestServer
 {
 public:
+  using CommandHandler =
+    std::function<std::string(const std::string &)>;
+
   RestServer(
     const std::string &host,
     int port,
     SharedState &shared_state,
-    std::function<void(const std::string &)> command_handler);
+    CommandHandler command_handler);
+
   ~RestServer();
 
   RestServer(const RestServer &) = delete;
@@ -32,12 +36,13 @@ private:
 
   std::string host_;
   int port_;
+
   SharedState &shared_state_;
-  std::function<void(const std::string &)> command_handler_;
+  CommandHandler command_handler_;
 
   httplib::Server server_;
   std::thread server_thread_;
   std::atomic<bool> running_{false};
 };
 
-#endif  // VAGOTEC_BACKEND_SERVICE__REST_SERVER_HPP_
+#endif

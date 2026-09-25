@@ -1,3 +1,7 @@
 config/edge.env
 *.generated.yaml
 *.generated.yml
+
+# React Frontend local artifacts
+frontend/react-dashboard/node_modules/
+frontend/react-dashboard/dist/
