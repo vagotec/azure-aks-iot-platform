@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://azure-aks-iot-platform-prometheus.azure-aks-iot.svc.cluster.local:9090
+    isDefault: true
+    editable: false

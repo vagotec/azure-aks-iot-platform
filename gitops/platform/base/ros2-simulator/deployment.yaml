@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-aks-iot-platform-ros2-simulator
+  labels:
+    app.kubernetes.io/name: ros2-simulator
+    app.kubernetes.io/part-of: azure-aks-iot-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ros2-simulator
+      app.kubernetes.io/part-of: azure-aks-iot-platform
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ros2-simulator
+        app.kubernetes.io/part-of: azure-aks-iot-platform
+    spec:
+      containers:
+        - name: ros2-simulator
+          image: azure-aks-iot-platform-ros2-simulator:local
+          imagePullPolicy: Never
+          env:
+            - name: ROS2_TOPIC
+              value: "/iot/telemetry"
+            - name: ROS2_COMMAND_SERVICE
+              value: "/iot/command"
+            - name: ROS_DOMAIN_ID
+              value: "42"
+            - name: DEVICE_ID
+              value: "edge-device-001"
+            - name: PUBLISH_INTERVAL_SECONDS
+              value: "2.0"

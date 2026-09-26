@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: Azure AKS IoT Platform
+    orgId: 1
+    folder: Azure AKS IoT Platform
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
