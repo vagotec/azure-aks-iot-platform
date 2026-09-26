@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: azure-aks-iot-platform-backend
+  annotations:
+    vagotec.io/gitops-test: phase-5e-gitops-test
   labels:
     app.kubernetes.io/name: backend
     app.kubernetes.io/part-of: azure-aks-iot-platform
