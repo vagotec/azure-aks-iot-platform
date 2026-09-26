@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: azure-aks-iot-platform
+  namespace: argocd
+spec:
+  description: Azure AKS IoT Platform GitOps project
+
+  sourceRepos:
+    - https://github.com/vagotec/azure-aks-iot-platform.git
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: azure-aks-iot
+
+  clusterResourceWhitelist:
+    - group: gateway.networking.k8s.io
+      kind: GatewayClass

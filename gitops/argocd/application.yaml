@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: azure-aks-iot-platform
+  namespace: argocd
+spec:
+  project: azure-aks-iot-platform
+
+  source:
+    repoURL: https://github.com/vagotec/azure-aks-iot-platform.git
+    targetRevision: main
+    path: gitops/platform/overlays/local-k3s
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: azure-aks-iot
