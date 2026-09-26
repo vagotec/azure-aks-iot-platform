@@ -16,5 +16,10 @@ spec:
     namespace: azure-aks-iot
 
   syncPolicy:
+    automated:
+      enabled: true
+      selfHeal: true
+      prune: false
+      allowEmpty: false
     syncOptions:
       - ServerSideApply=true
