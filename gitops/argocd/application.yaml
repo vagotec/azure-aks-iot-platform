@@ -14,3 +14,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: azure-aks-iot
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
