@@ -6,7 +6,9 @@ metadata:
     app.kubernetes.io/part-of: azure-aks-iot-platform
 spec:
   parentRefs:
-    - name: azure-aks-iot-platform
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: azure-aks-iot-platform
       sectionName: http
 
   rules:
@@ -15,13 +17,19 @@ spec:
             type: PathPrefix
             value: /api
       backendRefs:
-        - name: azure-aks-iot-platform-backend
+        - group: ""
+          kind: Service
+          name: azure-aks-iot-platform-backend
           port: 8080
+          weight: 1
 
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: azure-aks-iot-platform-frontend
+        - group: ""
+          kind: Service
+          name: azure-aks-iot-platform-frontend
           port: 8080
+          weight: 1
