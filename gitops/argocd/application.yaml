@@ -22,4 +22,5 @@ spec:
       prune: false
       allowEmpty: false
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true

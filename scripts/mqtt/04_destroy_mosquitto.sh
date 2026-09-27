@@ -56,11 +56,8 @@ else
 fi
 
 echo
-echo "=== Delete project namespace if empty ==="
-
-if kubectl get namespace "${K8S_NAMESPACE}" >/dev/null 2>&1; then
-    kubectl delete namespace "${K8S_NAMESPACE}" --wait=true
-fi
+echo "=== Preserve shared project namespace ==="
+echo "Namespace ${K8S_NAMESPACE} is shared and is not owned by Mosquitto."
 
 echo
 echo "=== Remove generated manifest ==="

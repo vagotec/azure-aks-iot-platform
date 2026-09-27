@@ -222,6 +222,40 @@ fi
 kubectl get nodes -o wide
 
 echo
+echo "=== Wait for K3s system deployments ==="
+
+for deployment in coredns local-path-provisioner metrics-server; do
+    echo "Waiting for deployment/${deployment} to be created ..."
+
+    if ! kubectl wait         --for=create         "deployment/${deployment}"         -n kube-system         --timeout=180s; then
+
+        echo "ERROR: deployment/${deployment} was not created."
+        kubectl get addons.k3s.cattle.io -n kube-system || true
+        kubectl get deployments -n kube-system || true
+        kubectl get events -n kube-system             --sort-by='.lastTimestamp' || true
+        sudo journalctl -u k3s -n 100 --no-pager || true
+        exit 1
+    fi
+
+    echo "Waiting for deployment/${deployment} rollout to complete ..."
+
+    if ! kubectl rollout status         "deployment/${deployment}"         -n kube-system         --timeout=180s; then
+
+        echo "ERROR: deployment/${deployment} rollout did not complete."
+        kubectl get pods -n kube-system -o wide || true
+        kubectl get deployments -n kube-system || true
+        kubectl get events -n kube-system             --sort-by='.lastTimestamp' || true
+        sudo journalctl -u k3s -n 100 --no-pager || true
+        exit 1
+    fi
+done
+
+echo
+echo "=== K3s system deployments ready ==="
+kubectl get deployments -n kube-system
+kubectl get pods -n kube-system -o wide
+
+echo
 echo "============================================================"
 echo " K3S DEPLOYED"
 echo "============================================================"
