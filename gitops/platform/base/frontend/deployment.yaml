@@ -20,7 +20,7 @@ spec:
       containers:
         - name: frontend
           image: azure-aks-iot-platform-frontend:local
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080

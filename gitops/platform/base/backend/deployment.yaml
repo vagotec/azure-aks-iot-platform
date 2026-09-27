@@ -29,7 +29,7 @@ spec:
       containers:
         - name: backend
           image: azure-aks-iot-platform-backend:local
-          imagePullPolicy: Never
+          imagePullPolicy: Always
 
           ports:
             - name: http

@@ -20,7 +20,7 @@ spec:
       containers:
         - name: ros2-simulator
           image: azure-aks-iot-platform-ros2-simulator:local
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           env:
             - name: ROS2_TOPIC
               value: "/iot/telemetry"

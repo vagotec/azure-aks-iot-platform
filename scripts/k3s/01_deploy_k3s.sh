@@ -171,6 +171,54 @@ for i in $(seq 1 60); do
     sleep 2
 done
 
+echo
+echo "=== Wait for Kubernetes node registration ==="
+
+for i in $(seq 1 60); do
+    if kubectl get node "${K3S_NODE_NAME}" >/dev/null 2>&1; then
+        break
+    fi
+
+    if [[ "${i}" -eq 60 ]]; then
+        echo "ERROR: Kubernetes node was not registered."
+        kubectl get nodes -o wide || true
+        sudo journalctl -u k3s -n 100 --no-pager || true
+        exit 1
+    fi
+
+    sleep 1
+done
+
+echo
+echo "=== Wait for Kubernetes node registration ==="
+
+for i in $(seq 1 60); do
+    if kubectl get node "${K3S_NODE_NAME}" >/dev/null 2>&1; then
+        break
+    fi
+
+    if [[ "${i}" -eq 60 ]]; then
+        echo "ERROR: Kubernetes node was not registered."
+        kubectl get nodes -o wide || true
+        sudo journalctl -u k3s -n 100 --no-pager || true
+        exit 1
+    fi
+
+    sleep 1
+done
+
+echo
+echo "=== Wait for Kubernetes node Ready ==="
+
+if ! kubectl wait     --for=condition=Ready     node/"${K3S_NODE_NAME}"     --timeout=180s; then
+
+    echo "ERROR: Kubernetes node did not become Ready."
+    kubectl get nodes -o wide || true
+    kubectl get pods -A -o wide || true
+    sudo journalctl -u k3s -n 100 --no-pager || true
+    exit 1
+fi
+
 kubectl get nodes -o wide
 
 echo

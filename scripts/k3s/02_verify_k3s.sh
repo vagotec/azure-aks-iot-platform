@@ -108,13 +108,14 @@ kubectl get endpointslice \
     -l kubernetes.io/service-name=kubernetes \
     -o wide
 
-mapfile -t API_ENDPOINT_IPS < <(
+API_ENDPOINT_RAW="$(
     kubectl get endpointslice \
         -n default \
         -l kubernetes.io/service-name=kubernetes \
-        -o jsonpath='{range .items[*].endpoints[*].addresses[*]}{.}{"\n"}{end}' |
-    sort -u
-)
+        -o jsonpath='{.items[*].endpoints[*].addresses[*]}'
+)"
+
+read -r -a API_ENDPOINT_IPS <<< "${API_ENDPOINT_RAW}"
 
 printf 'API endpoint IPs:'
 printf ' %s' "${API_ENDPOINT_IPS[@]:-}"

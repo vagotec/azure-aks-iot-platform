@@ -6,3 +6,16 @@ namespace: azure-aks-iot
 resources:
   - ../../base
   - gateway
+
+images:
+  - name: azure-aks-iot-platform-backend
+    newName: ghcr.io/vagotec/azure-aks-iot-platform-backend
+    newTag: latest
+
+  - name: azure-aks-iot-platform-ros2-simulator
+    newName: ghcr.io/vagotec/azure-aks-iot-platform-ros2-simulator
+    newTag: latest
+
+  - name: azure-aks-iot-platform-frontend
+    newName: ghcr.io/vagotec/azure-aks-iot-platform-frontend
+    newTag: latest

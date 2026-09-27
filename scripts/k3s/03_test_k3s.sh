@@ -34,6 +34,20 @@ kubectl create namespace "${TEST_NAMESPACE}" \
     -o yaml |
 kubectl apply -f -
 
+echo
+echo "=== Wait for default ServiceAccount ==="
+
+if ! kubectl wait \
+    --for=create \
+    serviceaccount/default \
+    -n "${TEST_NAMESPACE}" \
+    --timeout=60s; then
+
+    echo "ERROR: Default ServiceAccount was not created."
+    kubectl get serviceaccounts -n "${TEST_NAMESPACE}" || true
+    exit 1
+fi
+
 kubectl delete pod "${TEST_POD}" \
     -n "${TEST_NAMESPACE}" \
     --ignore-not-found=true \
@@ -60,6 +74,7 @@ kubectl run "${TEST_POD}" \
                 --output /tmp/api-response \
                 --write-out "%{http_code}" \
                 --cacert "${CA}" \
+                --header "Authorization: Bearer $(cat "${TOKEN_FILE}")" \
                 --connect-timeout 10 \
                 --max-time 20 \
                 https://kubernetes.default.svc/version
