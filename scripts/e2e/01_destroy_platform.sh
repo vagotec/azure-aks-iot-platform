@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_KUBECONFIG="${PROJECT_ROOT}/.state/k3s/kubeconfig"
+
+cd "${PROJECT_ROOT}"
 
 run() {
     local name="$1"
@@ -19,6 +22,28 @@ run() {
 echo "============================================================"
 echo " AZURE AKS IOT PLATFORM - COMPLETE GITOPS E2E DESTROY"
 echo "============================================================"
+
+# ---------------------------------------------------------------------------
+# Use the project-owned K3s kubeconfig for all Kubernetes operations.
+# ---------------------------------------------------------------------------
+
+if [[ ! -f "${PROJECT_KUBECONFIG}" ]]; then
+    echo "ERROR: Project kubeconfig does not exist:"
+    echo "  ${PROJECT_KUBECONFIG}"
+    echo
+    echo "The E2E destroy requires the project-owned kubeconfig while K3s exists."
+    exit 1
+fi
+
+export KUBECONFIG="${PROJECT_KUBECONFIG}"
+
+echo
+echo "=== Project Kubernetes context ==="
+echo "KUBECONFIG=${KUBECONFIG}"
+
+kubectl get nodes >/dev/null
+
+echo "OK: Kubernetes API reachable through project kubeconfig."
 
 # ---------------------------------------------------------------------------
 # Stop GitOps reconciliation first.
@@ -70,6 +95,11 @@ run "09 - Envoy Gateway Controller - VERIFY DESTROY" \
 
 run "10 - K3s - DESTROY" \
     "scripts/k3s/04_destroy_k3s.sh"
+
+# K3s destroy may remove the project-owned kubeconfig.
+# Verification must therefore not depend on kubectl afterwards.
+
+unset KUBECONFIG
 
 run "10 - K3s - VERIFY DESTROY" \
     "scripts/k3s/05_verify_destroy_k3s.sh"

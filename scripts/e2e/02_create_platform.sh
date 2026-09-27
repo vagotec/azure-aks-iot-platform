@@ -3,6 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PROJECT_KUBECONFIG="${PROJECT_ROOT}/.state/k3s/kubeconfig"
+
+cd "${PROJECT_ROOT}"
 
 run() {
     local name="$1"
@@ -26,6 +29,26 @@ echo "============================================================"
 # ---------------------------------------------------------------------------
 
 run "01 - K3s - DEPLOY" "scripts/k3s/01_deploy_k3s.sh"
+
+# 01_deploy_k3s.sh creates the project-owned kubeconfig.
+# Export it here so every subsequent E2E child process uses the same cluster.
+
+if [[ ! -f "${PROJECT_KUBECONFIG}" ]]; then
+    echo "ERROR: K3s deployment did not create the project kubeconfig:"
+    echo "  ${PROJECT_KUBECONFIG}"
+    exit 1
+fi
+
+export KUBECONFIG="${PROJECT_KUBECONFIG}"
+
+echo
+echo "=== Project Kubernetes context ==="
+echo "KUBECONFIG=${KUBECONFIG}"
+
+kubectl get nodes >/dev/null
+
+echo "OK: Kubernetes API reachable through project kubeconfig."
+
 run "01 - K3s - VERIFY" "scripts/k3s/02_verify_k3s.sh"
 run "01 - K3s - TEST"   "scripts/k3s/03_test_k3s.sh"
 
