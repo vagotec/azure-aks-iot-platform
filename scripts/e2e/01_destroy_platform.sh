@@ -72,7 +72,7 @@ run "04 - Mosquitto Exporter - DESTROY" \
     "scripts/monitoring/04_destroy_mosquitto_exporter.sh"
 
 run "05 - Frontend - DESTROY" \
-    "scripts/frontend/04_destroy_frontend.sh"
+    "scripts/frontend/06_destroy_frontend_gitops.sh"
 
 run "06 - Backend - DESTROY" \
     "scripts/backend/04_destroy_backend.sh"
