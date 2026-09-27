@@ -7,3 +7,12 @@ frontend/react-dashboard/node_modules/
 frontend/react-dashboard/dist/
 
 config/secrets.env
+
+# Local K3s configuration
+config/k3s.env
+
+# Local project runtime state
+.state/
+
+# Local migration backups
+.local-backup/
