@@ -14,5 +14,9 @@ spec:
       namespace: azure-aks-iot
 
   clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: azure-aks-iot
+
     - group: gateway.networking.k8s.io
       kind: GatewayClass

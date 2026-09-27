@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: azure-aks-iot
 
 resources:
+  - namespace.yaml
   - ../../base
   - gateway
 
